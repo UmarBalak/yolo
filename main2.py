@@ -1,8 +1,5 @@
 import cv2
-import numpy as np
-import time
 from ultralytics import YOLO
-from weather import hit_weather  # Import your weather function
 
 # Load YOLO Model
 model = YOLO('yolo11n.pt')
@@ -21,52 +18,29 @@ classes = {0: 'person', 1: 'bicycle', 2: 'car', 3: 'motorcycle', 4: 'airplane', 
            71: 'sink', 72: 'refrigerator', 73: 'book', 74: 'clock', 75: 'vase', 76: 'scissors', 77: 'teddy bear', 
            78: 'hair drier', 79: 'toothbrush'}
 
-# Initialize webcam
-cap = cv2.VideoCapture(0)
+def detection(cap):
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-# Weather data storage
-weather_data = []
-last_weather_update = time.time()  # Store the last weather API call time
-weather_update_interval = 30  # 30 minutes in seconds
+        personCount = 0
+        detected_objects = {}
 
-while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret:
-        break
+        # Perform Object Detection
+        results = model.predict(frame, conf=0.5)
+        annotated_frame = results[0].plot()
 
-    personCount = 0
-    detected_objects = {}
+        for box, cls in zip(results[0].boxes.xyxy, results[0].boxes.cls):
+            class_id = int(cls.item())
+            obj_name = classes.get(class_id, "Unknown")
 
-    # Perform Object Detection
-    results = model.predict(frame, conf=0.5)
-    annotated_frame = results[0].plot()
+            if class_id == 0:
+                personCount += 1
+            detected_objects[obj_name] = detected_objects.get(obj_name, 0) + 1
 
-    for box, cls in zip(results[0].boxes.xyxy, results[0].boxes.cls):
-        class_id = int(cls.item())
-        obj_name = classes.get(class_id, "Unknown")
+        # Print all detected objects separately
+        print(f"\nDetected Objects: \n{detected_objects}")
+        print(f"Total Persons Detected: {personCount}")
 
-        if class_id == 0:
-            personCount += 1
-        detected_objects[obj_name] = detected_objects.get(obj_name, 0) + 1
-
-    # Check if 30 minutes have passed
-    current_time = time.time()
-    if current_time - last_weather_update >= weather_update_interval:
-        weather_info = hit_weather()  # Call your weather API function
-        weather_data.append(weather_info)  # Store the weather data
-        last_weather_update = current_time  # Reset the timer
-        print(f"Weather Data Updated: {weather_info}")
-
-    # Print all detected objects separately
-    print(f"\nDetected Objects: \n{detected_objects}")
-    print(f"Total Persons Detected: {personCount}")
-
-    # Display Video
-    cv2.imshow("Surveillance Feed", annotated_frame)
-
-    if cv2.waitKey(1) == 27:  # ESC key to exit
-        break
-
-cap.release()
-cv2.destroyAllWindows()
-
+        return {'detected objects': detected_objects, 'total persons': personCount}
