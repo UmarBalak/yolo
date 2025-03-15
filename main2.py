@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
+import time
 from ultralytics import YOLO
+from weather import hit_weather  # Import your weather function
 
 # Load YOLO Model
 model = YOLO('yolo11n.pt')
@@ -22,6 +24,11 @@ classes = {0: 'person', 1: 'bicycle', 2: 'car', 3: 'motorcycle', 4: 'airplane', 
 # Initialize webcam
 cap = cv2.VideoCapture(0)
 
+# Weather data storage
+weather_data = []
+last_weather_update = time.time()  # Store the last weather API call time
+weather_update_interval = 30  # 30 minutes in seconds
+
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
@@ -42,9 +49,16 @@ while cap.isOpened():
             personCount += 1
         detected_objects[obj_name] = detected_objects.get(obj_name, 0) + 1
 
+    # Check if 30 minutes have passed
+    current_time = time.time()
+    if current_time - last_weather_update >= weather_update_interval:
+        weather_info = hit_weather()  # Call your weather API function
+        weather_data.append(weather_info)  # Store the weather data
+        last_weather_update = current_time  # Reset the timer
+        print(f"Weather Data Updated: {weather_info}")
+
     # Print all detected objects separately
     print(f"\nDetected Objects: \n{detected_objects}")
-
     print(f"Total Persons Detected: {personCount}")
 
     # Display Video
@@ -55,3 +69,4 @@ while cap.isOpened():
 
 cap.release()
 cv2.destroyAllWindows()
+
